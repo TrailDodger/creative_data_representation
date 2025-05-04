@@ -1,0 +1,148 @@
+---
+title: "creative data"
+format: html
+editor: visual
+---
+
+## Creative Data Visualization Assignment
+
+### Loading in my data
+
+```{r}
+library(tidyverse)
+
+raw <- read_csv("C:/Users/edodg/Documents/SchoolDocs25on/Research/Chpt1/wide.csv")
+
+```
+
+```{r}
+head(raw)
+```
+
+### Wrangle the data 
+
+```{r}
+long <- raw |>
+  pivot_longer(
+    cols = c(Eland, Springbok, Wildebeest, Steenbok, Gemsbok),  
+    names_to = "Species",
+    values_to = "Detected"
+  )
+long <- long|>
+  select(DateTime, Camera, Species, Detected)
+```
+
+```{r}
+head(long)
+```
+
+### Detection probabilities
+
+```{r}
+detection_probs <- long |>
+  group_by(Camera, Species) |>
+  summarize(
+    Detection_Prob = sum(Detected > 0) / n(),
+    .groups = "drop"
+  )
+```
+
+```{r}
+head(detection_probs)
+```
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+detection_cp <- detection_probs |>
+  group_by(Species) |>
+  summarize(CP = mean(Detection_Prob), .groups = "drop") |>
+  mutate(CP = round(CP * 1000))
+```
+
+```{r}
+head(detection_cp)
+```
+
+```{r}
+detection_cp <- detection_cp |>
+  mutate(
+    Tier = case_when(
+      CP >= 80 ~ "Gold",
+      CP >= 60 ~ "Silver",
+      TRUE     ~ "Bronze"
+    )
+  )
+```
+
+```{r}
+write_csv(
+  detection_probs,
+  "C:/Users/edodg/Documents/SchoolDocs25on/ADA/creative_data_representation/detection_probs.csv"
+)
+```
+
+```{r}
+detection_probs <- read_csv("detection_probs.csv")
+
+detection_cp <- detection_probs |>
+  group_by(Species) |>
+  summarize(CP = round(mean(Detection_Prob) * 10000), .groups = "drop") |>
+  mutate(
+    Image = paste0(tolower(Species), ".png"),
+    Descriptor = case_when(
+      CP <= 25 ~ "Wimp",
+      CP <= 30 ~ "Scrappy",
+      CP <= 50 ~ "Schoolyard Bully",
+      CP <= 400 ~ "Heavyweight",
+      TRUE ~ "RUN FOR YOUR LIFE"
+    )
+  )
+```
+
+### Visualization
+
+```{r}
+head(detection_cp)
+```
+
+```{r}
+install.packages("ggimage")
+```
+
+```{r}
+library(ggimage)
+```
+
+```{r}
+install.packages("patchwork")
+```
+
+```{r}
+library(patchwork)
+```
+
+```{r}
+card_list <- map(1:nrow(detection_cp), function(i) {
+  sp <- detection_cp[i, ]
+  
+  ggplot(sp, aes(x = 1, y = 1)) +
+    geom_tile(fill = "#f7f0e8", color = "black", width = 1.6, height = 1.2) +
+    geom_image(aes(image = Image), size = 0.35, y = 1.15) +
+    annotate("text", x = 1, y = 0.75, label = sp$Species, size = 7, fontface = "bold") +
+    annotate("text", x = 1, y = 0.5, label = paste0("CP ", sp$CP), size = 6) +
+    annotate("text", x = 1, y = 0.3, label = sp$Descriptor, size = 5, fontface = "italic") +
+    theme_void() +
+    theme(plot.margin = margin(10, 10, 10, 10))
+})
+```
+
+```{r}
+card_deck <- wrap_plots(card_list, ncol = 3)
+```
+
+```{r}
+card_deck
+```
