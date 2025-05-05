@@ -52,29 +52,15 @@ head(detection_probs)
 ```
 
 ```{r}
+detection_probs
+```
+
+```{r}
 library(ggplot2)
 ```
 
 ```{r}
-detection_cp <- detection_probs |>
-  group_by(Species) |>
-  summarize(CP = mean(Detection_Prob), .groups = "drop") |>
-  mutate(CP = round(CP * 1000))
-```
-
-```{r}
 head(detection_cp)
-```
-
-```{r}
-detection_cp <- detection_cp |>
-  mutate(
-    Tier = case_when(
-      CP >= 80 ~ "Gold",
-      CP >= 60 ~ "Silver",
-      TRUE     ~ "Bronze"
-    )
-  )
 ```
 
 ```{r}
@@ -86,27 +72,9 @@ write_csv(
 
 ```{r}
 detection_probs <- read_csv("detection_probs.csv")
-
-detection_cp <- detection_probs |>
-  group_by(Species) |>
-  summarize(CP = round(mean(Detection_Prob) * 10000), .groups = "drop") |>
-  mutate(
-    Image = paste0(tolower(Species), ".png"),
-    Descriptor = case_when(
-      CP <= 25 ~ "Wimp",
-      CP <= 30 ~ "Scrappy",
-      CP <= 50 ~ "Schoolyard Bully",
-      CP <= 400 ~ "Heavyweight",
-      TRUE ~ "RUN FOR YOUR LIFE"
-    )
-  )
 ```
 
 ### Visualization
-
-```{r}
-head(detection_cp)
-```
 
 ```{r}
 install.packages("ggimage")
@@ -125,24 +93,51 @@ library(patchwork)
 ```
 
 ```{r}
+detection_cp <- detection_probs |>
+  group_by(Species) |>
+  summarize(
+    Detection_Prob = sum(Detection_Prob),
+    .groups = "drop"
+  ) |>
+  mutate(
+    Relative_Prob = Detection_Prob / max(Detection_Prob),              
+    CP = round(Relative_Prob * 100),                                    
+    Image = paste0(tolower(Species), ".png"),
+    Descriptor = case_when(
+      CP <= 5 ~ "Wimp",
+      CP <= 30 ~ "Scrappy",
+      CP <= 75 ~ "Schoolyard Bully",
+      CP <= 100 ~ "RUN FOR YOUR LIFE"
+    )
+  )
+```
+
+```{r}
+head(detection_cp)
+```
+
+```{r}
 card_list <- map(1:nrow(detection_cp), function(i) {
   sp <- detection_cp[i, ]
-  
+
   ggplot(sp, aes(x = 1, y = 1)) +
     geom_tile(fill = "#f7f0e8", color = "black", width = 1.6, height = 1.2) +
+    
     geom_image(aes(image = Image), size = 0.35, y = 1.15) +
+    
     annotate("text", x = 1, y = 0.75, label = sp$Species, size = 7, fontface = "bold") +
+    
     annotate("text", x = 1, y = 0.5, label = paste0("CP ", sp$CP), size = 6) +
     annotate("text", x = 1, y = 0.3, label = sp$Descriptor, size = 5, fontface = "italic") +
+
+    geom_rect(aes(xmin = 0.5, xmax = 1.5, ymin = 0.05, ymax = 0.1), fill = "#dddddd") +
+geom_rect(aes(xmin = 0.5, xmax = 0.5 + sp$Relative_Prob, ymin = 0.05, ymax = 0.1), fill = "#3c8dbc") +
+annotate("text", x = 1, y = 0.13, label = paste0("Rel. Detection: ", round(sp$Relative_Prob, 2)), size = 4.5) +
     theme_void() +
     theme(plot.margin = margin(10, 10, 10, 10))
 })
 ```
 
 ```{r}
-card_deck <- wrap_plots(card_list, ncol = 3)
-```
-
-```{r}
-card_deck
+card_list
 ```
